@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kalkulator Regresi Linier</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800">
+  <header class="px-6 py-6 bg-white border-b border-slate-200 sticky top-0 z-20">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <h1 class="text-2xl sm:text-3xl font-bold">Kalkulator Regresi Linier</h1>
+      <button id="printBtn" class="no-print px-4 py-2 bg-slate-900 text-white rounded-xl">Cetak / Simpan PDF</button>
+    </div>
+  </header>
+
+  <main class="px-6 py-8 max-w-4xl mx-auto grid gap-6">
+    <!-- Hasil -->
+    <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+      <h2 class="text-xl font-semibold mb-2">Hasil Regresi</h2>
+      <p class="text-slate-600">Persamaan garis terbaik berdasarkan data yang dimasukkan:</p>
+      <div class="mt-4 text-2xl font-bold" id="equation">y = a + bx</div>
+      <div class="mt-2 grid grid-cols-3 gap-4 text-sm">
+        <div class="bg-slate-50 rounded-xl p-3">
+          <div class="text-slate-400">Intercept (a)</div>
+          <div id="aVal" class="text-xl font-bold">0</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3">
+          <div class="text-slate-400">Slope (b)</div>
+          <div id="bVal" class="text-xl font-bold">0</div>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3">
+          <div class="text-slate-400">R²</div>
+          <div id="r2Val" class="text-xl font-bold">0</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cara Pengerjaan -->
+    <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+      <h2 class="text-xl font-semibold mb-2">Cara Pengerjaan</h2>
+      <div id="steps" class="text-slate-700 text-sm space-y-2">
+        <p>Masukkan data untuk melihat langkah perhitungan.</p>
+      </div>
+    </section>
+
+    <!-- Tabel Input -->
+    <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+      <div class="flex justify-between items-end">
+        <div>
+          <h2 class="text-xl font-semibold">Data X dan Y</h2>
+          <p class="text-slate-600 text-sm">Masukkan nilai pasangan X dan Y.</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="sampleBtn" class="px-3 py-2 bg-slate-100 rounded-xl">Contoh Data</button>
+          <button id="clearBtn" class="px-3 py-2 bg-slate-100 rounded-xl">Reset</button>
+          <button id="exportCSV" class="px-3 py-2 bg-slate-900 text-white rounded-xl">Export CSV</button>
+        </div>
+      </div>
+
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full border border-slate-200 rounded-xl">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-3 py-2 border-b text-left">X</th>
+              <th class="px-3 py-2 border-b text-left">Y</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="text-center text-slate-500 text-sm py-6">
+    Dibuat oleh <span class="font-semibold">Zeni Ibnu Hakim</span> · © <span id="year"></span>
+  </footer>
+
+  <script>
+    const tbody = document.getElementById('tbody');
+    const equation = document.getElementById('equation');
+    const aVal = document.getElementById('aVal');
+    const bVal = document.getElementById('bVal');
+    const r2Val = document.getElementById('r2Val');
+    const steps = document.getElementById('steps');
+    const sampleBtn = document.getElementById('sampleBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const exportCSV = document.getElementById('exportCSV');
+    const printBtn = document.getElementById('printBtn');
+
+    function buildRows(values = []) {
+      tbody.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        const x = values[i]?.x ?? '';
+        const y = values[i]?.y ?? '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-3 py-2 border-t">
+            <input type="number" step="0.0001" value="${x}" class="w-32 px-2 py-1 border rounded-lg" data-col="x" data-index="${i}">
+          </td>
+          <td class="px-3 py-2 border-t">
+            <input type="number" step="0.0001" value="${y}" class="w-32 px-2 py-1 border rounded-lg" data-col="y" data-index="${i}">
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function getValues() {
+      const inputs = tbody.querySelectorAll('input');
+      const xs = [], ys = [];
+      inputs.forEach(inp => {
+        const v = parseFloat(inp.value);
+        if (!Number.isNaN(v)) {
+          if (inp.dataset.col === 'x') xs[inp.dataset.index] = v;
+          else ys[inp.dataset.index] = v;
+        }
+      });
+      return { xs: xs.filter(v => v !== undefined), ys: ys.filter(v => v !== undefined) };
+    }
+
+    function linearRegression(xs, ys) {
+      const n = xs.length;
+      if (n < 2) return { a: 0, b: 0, r2: 0, steps: [] };
+
+      const sumX = xs.reduce((a, b) => a + b, 0);
+      const sumY = ys.reduce((a, b) => a + b, 0);
+      const sumXY = xs.reduce((acc, x, i) => acc + x * ys[i], 0);
+      const sumX2 = xs.reduce((acc, x) => acc + x * x, 0);
+
+      const b = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      const a = (sumY - b * sumX) / n;
+
+      // R²
+      const meanY = sumY / n;
+      const ssTot = ys.reduce((acc, y) => acc + (y - meanY) ** 2, 0);
+      const ssRes = ys.reduce((acc, y, i) => acc + (y - (a + b * xs[i])) ** 2, 0);
+      const r2 = 1 - ssRes / ssTot;
+
+      // Langkah pengerjaan detail
+      const steps = [
+        `<b>Langkah 1:</b> Jumlah data n = ${n}`,
+        `<b>Langkah 2:</b> Hitung jumlah: ΣX = ${xs.join(' + ')} = ${sumX}, ΣY = ${ys.join(' + ')} = ${sumY}`,
+        `<b>Langkah 3:</b> Hitung ΣXY = ${xs.map((x,i)=>`${x}×${ys[i]}`).join(' + ')} = ${sumXY}`,
+        `<b>Langkah 4:</b> Hitung ΣX² = ${xs.map(x=>`${x}²`).join(' + ')} = ${sumX2}`,
+        `<b>Langkah 5:</b> Rumus slope (b): b = (nΣXY - ΣXΣY) / (nΣX² - (ΣX)²)`,
+        `b = (${n}×${sumXY} - ${sumX}×${sumY}) / (${n}×${sumX2} - (${sumX})²)`,
+        `b = ${(n*sumXY)} - ${(sumX*sumY)} / ${(n*sumX2)} - ${sumX*sumX}`,
+        `b = <b>${b.toFixed(4)}</b>`,
+        `<b>Langkah 6:</b> Rumus intercept (a): a = (ΣY - bΣX) / n`,
+        `a = (${sumY} - (${b.toFixed(4)}×${sumX})) / ${n}`,
+        `a = <b>${a.toFixed(4)}</b>`,
+        `<b>Langkah 7:</b> Persamaan regresi: y = ${a.toFixed(2)} + ${b.toFixed(2)}x`,
+        `<b>Langkah 8:</b> Koefisien determinasi R² = ${r2.toFixed(4)}`
+      ];
+
+      return { a, b, r2, steps };
+    }
+
+    function recalc() {
+      const { xs, ys } = getValues();
+      if (xs.length && ys.length && xs.length === ys.length) {
+        const { a, b, r2, steps: stepArr } = linearRegression(xs, ys);
+        aVal.textContent = a.toFixed(4);
+        bVal.textContent = b.toFixed(4);
+        r2Val.textContent = r2.toFixed(4);
+        equation.textContent = `y = ${a.toFixed(2)} + ${b.toFixed(2)}x`;
+        steps.innerHTML = stepArr.map(s => `<p>${s}</p>`).join('');
+      } else {
+        aVal.textContent = bVal.textContent = r2Val.textContent = '0';
+        equation.textContent = "y = a + bx";
+        steps.innerHTML = "<p>Masukkan data untuk melihat langkah perhitungan.</p>";
+      }
+    }
+
+    function fillSample() {
+      const example = [{x:1,y:2},{x:2,y:3},{x:3,y:5},{x:4,y:7},{x:5,y:11}];
+      buildRows(example);
+      recalc();
+    }
+
+    function clearAll() {
+      buildRows([]);
+      recalc();
+    }
+
+    function toCSV() {
+      const { xs, ys } = getValues();
+      let csv = 'X,Y\n';
+      xs.forEach((x,i) => { csv += `${x},${ys[i]}\n`; });
+      const { a,b,r2 } = linearRegression(xs,ys);
+      csv += `Intercept (a),${a}\nSlope (b),${b}\nR2,${r2}\n`;
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const aTag = document.createElement('a');
+      aTag.href = url;
+      aTag.download = 'regresi_linier.csv';
+      aTag.click();
+      URL.revokeObjectURL(url);
+    }
+
+    (function init(){
+      document.getElementById('year').textContent = new Date().getFullYear();
+      buildRows([]);
+      tbody.addEventListener('input', recalc);
+      sampleBtn.addEventListener('click', fillSample);
+      clearBtn.addEventListener('click', clearAll);
+      exportCSV.addEventListener('click', toCSV);
+      printBtn.addEventListener('click', () => window.print());
+    })();
+  </script>
+</body>
+</html>
